@@ -75,8 +75,18 @@ func cmdAdd(c *Client, args []string) error {
 	if err != nil {
 		return err
 	}
+	tracks, err := c.playlistTracks(id)
+	if err != nil {
+		return err
+	}
+	n := queued(tracks, p.Item)
 	var uris []string
-	for _, q := range args {
+	for i, q := range args {
+		if n+len(uris) >= queueDepth {
+			fmt.Printf("QUEUE_FULL not added: %q (keep %d queued; deeper picks go stale when the listener skips)\n",
+				args[i:], queueDepth)
+			break
+		}
 		t, cands, err := c.resolve(q)
 		if err != nil {
 			return err
@@ -93,11 +103,7 @@ func cmdAdd(c *Client, args []string) error {
 			return err
 		}
 	}
-	tracks, err := c.playlistTracks(id)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("queued=%d\n", queued(tracks, p.Item))
+	fmt.Printf("queued=%d\n", n+len(uris))
 	return nil
 }
 
@@ -148,7 +154,10 @@ func cmdStatus(c *Client) error {
 }
 
 const (
-	pollEvery = 3 * time.Second
+	// picks kept ahead of the current track: enough that autoplay never kicks in,
+	// few enough that feedback doesn't invalidate a long tail
+	queueDepth = 2
+	pollEvery  = 3 * time.Second
 	// a track that changes with less than this left counts as played through, not skipped
 	playedSlack = 8 * time.Second
 	idleLimit   = 30 * time.Minute
@@ -174,7 +183,7 @@ func cmdWait(c *Client) error {
 	if p.Item == nil {
 		return fmt.Errorf("nothing playing")
 	}
-	if n := queued(tracks, p.Item); n < 2 {
+	if n := queued(tracks, p.Item); n < queueDepth {
 		fmt.Printf("NEED_TRACK now=%q queued=%d\n", p.Item.String(), n)
 		return nil
 	}

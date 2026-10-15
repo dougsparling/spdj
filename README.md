@@ -53,7 +53,7 @@ You are the DJ. `spdj` handles playback mechanics; you choose the music.
    ```
 4. **React to the event**, add picks until `queued=2` again, and go back to step 3.
 
-Keep two tracks queued. More than that and the picks go stale when the listener gives feedback; fewer and Spotify's autoplay can take over if a track ends while you're thinking.
+Keep two tracks queued (`add` refuses picks beyond that with `QUEUE_FULL`). More than that and the picks go stale when the listener gives feedback; fewer and Spotify's autoplay can take over if a track ends while you're thinking.
 
 ### Events from `spdj wait`
 

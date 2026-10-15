@@ -11,7 +11,7 @@ const usage = `spdj: agent-driven DJing on Spotify
 
   spdj auth --client-id ID [--redirect URI]
   spdj start --vibe TEXT [--seed current|"Artist - Title"|URI]
-                                  new dated playlist seeded with a track, starts playing it
+                                  new "SPDJ · vibe" playlist seeded with a track, starts playing it
   spdj sessions                   past sessions, most recent first
   spdj resume [latest|TEXT]       continue a past session from its last track
   spdj add "Artist - Title" ...   append picks to the playing session
@@ -19,12 +19,28 @@ const usage = `spdj: agent-driven DJing on Spotify
   spdj status                     setlist, vibe and feedback notes
   spdj note TEXT                  append listener feedback to the playlist description
   spdj api METHOD PATH [JSON]     raw Web API call (debugging)
+
+Agents: you are the DJ, spdj handles playback.
+  1. spdj start (or spdj resume), seeded from what's playing or a track that fits the vibe
+  2. spdj add two picks. Keep exactly 2 queued; add refuses more.
+  3. Run spdj wait in the background. It exits with one line when the track changes:
+       NEXT        played through: mild approval; add 1
+       SKIPPED     listener skipped it (removed, stale picks flushed): change direction; add 2
+       MANUAL      listener played something themselves (now in the setlist): follow it; add 2
+       JUMP        listener moved within the playlist; top up to 2
+       NEED_TRACK  fewer than 2 queued; add picks
+       IDLE        nothing played for 30m; stop
+  4. Top back up to 2 and wait again. Record anything the listener says with spdj note.
 `
 
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
+	}
+	if a := os.Args[1]; a == "help" || a == "-h" || a == "--help" {
+		fmt.Print(usage)
+		return
 	}
 	cmd, args := os.Args[1], os.Args[2:]
 	var err error
