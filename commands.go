@@ -106,7 +106,7 @@ func cmdAdd(c *Client, args []string) error {
 	}
 	fmt.Printf("queued=%d\n", n+len(uris))
 	if n+len(uris) >= queueDepth {
-		fmt.Println("next: run `spdj wait` in the background; it exits with one event line when the track changes")
+		fmt.Println("next: run `spdj wait` in the background; it exits with one event line when the track changes. Introduce each new track to the listener in a line or two.")
 	} else {
 		fmt.Println(nextAdd(n + len(uris)))
 	}

@@ -31,6 +31,8 @@ Agents: you are the DJ, spdj handles playback.
        NEED_TRACK  fewer than 2 queued; add picks
        IDLE        nothing played for 30m; stop
   4. Top back up to 2 and wait again. Record anything the listener says with spdj note.
+  When a new track starts, give the listener a line or two of flavour: who it is, where it comes
+  from, and why it fits (or turns) the set. They're mostly passive; this is the DJ's patter.
 `
 
 func main() {
