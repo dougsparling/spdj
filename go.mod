@@ -1,3 +1,3 @@
-module github.com/cyberdeck/spdj
+module github.com/dougsparling/spdj
 
-go 1.26.5
+go 1.22
