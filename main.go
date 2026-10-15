@@ -35,6 +35,7 @@ Agents: you are the DJ, spdj handles playback.
        IDLE        nothing played for 30m; stop
      Any event may end with liked=new: the listener liked the previous track while it played,
      the strongest positive signal you'll get. ADDED lines marked [liked] are known favourites.
+     add refuses songs already in the set (DUPLICATE).
   4. Top back up to 2 and wait again. Record anything the listener says with spdj note.
   When a new track starts, give the listener a line or two of flavour: who it is, where it
   comes from, why it fits (or turns) the set. Draw on the about= line if present, but

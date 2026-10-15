@@ -97,6 +97,10 @@ func cmdAdd(c *Client, args []string) error {
 			fmt.Printf("NOT_FOUND %q%s\n", q, candidates(cands))
 			continue
 		}
+		if dup := slices.IndexFunc(tracks, func(x Track) bool { return sameSong(&x, t) }); dup >= 0 || slices.Contains(uris, t.URI) {
+			fmt.Printf("DUPLICATE %q already in the set; pick something else\n", t.String())
+			continue
+		}
 		uris = append(uris, t.URI)
 		flag := ""
 		if c.isLiked(t.URI) {
@@ -202,6 +206,7 @@ func cmdWait(c *Client) error {
 	prev, lastProgress := p.Item, p.ProgressMS
 	// a like that appears while this track plays is a strong positive signal
 	wasLiked := c.isLiked(prev.URI)
+	offContext := false
 	idleSince := time.Now()
 	for {
 		time.Sleep(pollEvery)
@@ -217,8 +222,11 @@ func cmdWait(c *Client) error {
 			continue
 		}
 		idleSince = time.Now()
-		if p.Item.URI == prev.URI {
+		if sameSong(p.Item, prev) {
+			// the app's music-video toggle swaps in the same song under another ID or context;
+			// let it play, and resume the playlist when it ends rather than treating it as a pick
 			lastProgress = p.ProgressMS
+			offContext = offContext || p.Item.URI != prev.URI || p.contextURI() != sessionURI
 			continue
 		}
 		liked := ""
@@ -226,7 +234,7 @@ func cmdWait(c *Client) error {
 			liked = " liked=new"
 			c.addNote(id, "+"+prev.Name+" (liked)")
 		}
-		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p, liked); err != nil {
+		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p, liked, offContext); err != nil {
 			return err
 		}
 		printAbout(c, p.Item)
@@ -235,7 +243,7 @@ func cmdWait(c *Client) error {
 }
 
 // liked is appended to the event line (" liked=new" when the previous track was liked while playing).
-func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress int, p *Player, liked string) error {
+func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress int, p *Player, liked string, offContext bool) error {
 	tracks, err := c.playlistTracks(id)
 	if err != nil {
 		return err
@@ -243,6 +251,22 @@ func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress in
 	prevIdx := lastIndex(tracks, prev.URI)
 	newIdx := currentIndex(tracks, p.Item)
 	now := p.Item.String()
+
+	if offContext && (p.contextURI() != sessionURI || newIdx < 0) && prevIdx >= 0 && prevIdx+1 < len(tracks) {
+		// the last song played outside the playlist (e.g. as a music video); whatever followed it there
+		// isn't the listener's pick, so carry on with the next queued track
+		newIdx = prevIdx + 1
+		if err := c.call("PUT", "/me/player/play", map[string]any{
+			"context_uri": sessionURI,
+			"offset":      map[string]int{"position": newIdx},
+		}, nil); err != nil {
+			return err
+		}
+		p.Item, p.Context = &tracks[newIdx], &struct {
+			URI string `json:"uri"`
+		}{sessionURI}
+		now = p.Item.String()
+	}
 
 	if p.contextURI() != sessionURI || newIdx < 0 {
 		// pull the listener's pick into the setlist right after the last track and resume the playlist on it
@@ -440,4 +464,21 @@ func sessionName(vibe string) string {
 		cut = cut[:i]
 	}
 	return strings.TrimRight(cut, " ,;:·-") + "…"
+}
+
+// sameSong treats different releases or video versions of a song as the same song.
+func sameSong(a, b *Track) bool {
+	if a.URI == b.URI {
+		return true
+	}
+	return songKey(a) == songKey(b)
+}
+
+func songKey(t *Track) string {
+	artist := ""
+	if len(t.Artists) > 0 {
+		artist = t.Artists[0].Name
+	}
+	title, _, _ := strings.Cut(t.Name, " - ") // " - 2010 Remaster", " - Live"
+	return norm(artist) + "|" + norm(title)
 }
