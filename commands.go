@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"html"
 	"slices"
 	"strings"
 	"time"
@@ -41,7 +42,7 @@ func cmdStart(c *Client, args []string) error {
 		track = t
 	}
 
-	name := time.Now().Format("2006-01-02") + noteSep + *vibe
+	name := sessionPrefix + *vibe
 	var pl struct {
 		ID string `json:"id"`
 	}
@@ -301,3 +302,87 @@ func candidates(ts []Track) string {
 }
 
 func mmss(ms int) string { return fmt.Sprintf("%d:%02d", ms/60000, ms/1000%60) }
+
+// Session playlists are recognised by name; Spotify's own date sort handles ordering in its UI.
+const sessionPrefix = "SPDJ" + noteSep
+
+type sessionInfo struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Items       struct {
+		Total int `json:"total"`
+	} `json:"items"`
+}
+
+// sessions lists spdj playlists in library order, which is most recent first.
+func (c *Client) sessions() ([]sessionInfo, error) {
+	var out []sessionInfo
+	next := "/me/playlists?limit=50"
+	for next != "" {
+		var page struct {
+			Next  string        `json:"next"`
+			Items []sessionInfo `json:"items"`
+		}
+		if err := c.call("GET", next, nil, &page); err != nil {
+			return nil, err
+		}
+		for _, s := range page.Items {
+			if strings.HasPrefix(s.Name, sessionPrefix) {
+				s.Description = html.UnescapeString(s.Description)
+				out = append(out, s)
+			}
+		}
+		next = page.Next
+	}
+	return out, nil
+}
+
+func cmdSessions(c *Client) error {
+	ss, err := c.sessions()
+	if err != nil {
+		return err
+	}
+	for _, s := range ss {
+		fmt.Printf("%q tracks=%d notes=%q\n", strings.TrimPrefix(s.Name, sessionPrefix), s.Items.Total, s.Description)
+	}
+	return nil
+}
+
+// cmdResume plays a past session from its last track, so the set continues rather than replays.
+func cmdResume(c *Client, args []string) error {
+	ss, err := c.sessions()
+	if err != nil {
+		return err
+	}
+	q := strings.ToLower(strings.Join(args, " "))
+	var s *sessionInfo
+	for i := range ss {
+		if q == "" || q == "latest" || strings.Contains(strings.ToLower(ss[i].Name), q) {
+			s = &ss[i]
+			break
+		}
+	}
+	if s == nil {
+		return fmt.Errorf("no session matching %q; see: spdj sessions", q)
+	}
+	// the listing's track count lags recent additions; count for real
+	tracks, err := c.playlistTracks(s.ID)
+	if err != nil {
+		return err
+	}
+	if len(tracks) == 0 {
+		return fmt.Errorf("session %q is empty", s.Name)
+	}
+	if err := c.call("PUT", "/me/player/shuffle?state=false", nil, nil); err != nil {
+		return err
+	}
+	if err := c.call("PUT", "/me/player/play", map[string]any{
+		"context_uri": "spotify:playlist:" + s.ID,
+		"offset":      map[string]int{"position": len(tracks) - 1},
+	}, nil); err != nil {
+		return err
+	}
+	fmt.Printf("RESUMED %q now=%q tracks=%d queued=0\nnotes=%q\n", s.Name, tracks[len(tracks)-1].String(), len(tracks), s.Description)
+	return nil
+}

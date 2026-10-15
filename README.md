@@ -4,7 +4,7 @@ Let an AI agent DJ your Spotify. You put on a track (or describe a vibe), and th
 
 `spdj` is the command-line tool the agent drives. It was built for long listening sessions, where driving Spotify through a chatty API integration burns a lot of tokens. `spdj` does the polling and playlist bookkeeping itself and only wakes the agent with a one-line event when a decision is needed.
 
-Each session becomes a regular Spotify playlist (e.g. `2026-10-15 · slow + weird`), so you keep the setlist afterwards.
+Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), so you keep the setlist afterwards and can pick the set back up later.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ You are the DJ. `spdj` handles playback mechanics; you choose the music.
 
 ### The loop
 
-1. **Start a session.** Seed from what's playing, or pick a seed track that fits the listener's vibe:
+1. **Start a session**, or resume a past one (see below). Seed from what's playing, or pick a seed track that fits the listener's vibe:
    ```sh
    spdj start --vibe "slow + weird"                                  # seed = current track
    spdj start --vibe "slow + weird" --seed "Have A Nice Life - Bloodhail"
@@ -68,6 +68,16 @@ Keep two tracks queued. More than that and the picks go stale when the listener 
 
 Most of the time the listener is passive, so `NEXT` will be the common case. Treat a played-through track as mild approval, not enthusiasm.
 
+### Resuming a past session
+
+```sh
+spdj sessions                  # past sessions, most recent first, with their feedback notes
+spdj resume                    # continue the most recent one from its last track
+spdj resume "slow + weird"     # or match by name
+```
+
+`resume` prints the session's vibe and feedback notes. Read them, then queue two picks and enter the loop as usual.
+
 ### Other commands
 
 ```sh
@@ -77,7 +87,8 @@ spdj status                    # setlist, current position, vibe + feedback note
 ```
 
 - **`NOT_FOUND`** means the track isn't on Spotify in the listener's country, or the artist/title is off. Check the candidates, fix the spelling, or pick something else.
-- **`note`** writes to the playlist description, which is the session's memory. When resuming a session (or after losing context), run `spdj status` first.
+- **`note`** writes to the playlist description, which is the session's memory. After losing context mid-session, run `spdj status` first.
+- `add`, `wait`, `note` and `status` only act on a playing `SPDJ · …` playlist, so they never edit the listener's own playlists.
 
 ### Picking well
 
@@ -87,7 +98,7 @@ spdj status                    # setlist, current position, vibe + feedback note
 
 ## How it works
 
-- **No local session state.** The playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (their pick)`). The only local file is the login token.
+- **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (their pick)`). The only local file is the login token.
 - **`wait` polls** Spotify's player API every 3 seconds. A track that changes with more than ~11 seconds left counts as a skip.
 - **Picks are appended to the playlist**, which Spotify plays in order. `spdj start` turns shuffle off for this reason.
 - **Manual picks get steered back:** the track is inserted into the playlist and playback restarts on it from within the playlist at the same position (expect a brief hiccup).
@@ -95,7 +106,7 @@ spdj status                    # setlist, current position, vibe + feedback note
 ## Limitations
 
 - **Switching away hijacks your music.** If you put on a different album or playlist on purpose, `wait` treats it as a manual pick and pulls it into the session. Stop the agent's loop first.
-- **Feedback notes are eventually consistent.** Spotify's playlist description reads lag writes by a few seconds, so two notes written back-to-back can clobber each other.
+- **Spotify reads lag writes by a few seconds.** Two feedback notes written back-to-back can clobber each other, and `spdj sessions` may undercount tracks on a session that was just edited.
 - **The description holds about 500 characters.** Older notes get dropped to make room; the vibe is always kept.
 - **No recommendations.** Spotify removed its recommendations API for new apps, so picks come entirely from the agent's own knowledge of music.
 

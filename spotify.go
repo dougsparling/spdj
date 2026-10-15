@@ -52,14 +52,25 @@ func (c *Client) player() (*Player, error) {
 }
 
 // sessionPlaylist is the playlist currently playing: the DJ session lives there.
+// It must be an spdj playlist, so skips never delete tracks from the listener's own playlists.
 func (c *Client) sessionPlaylist() (string, *Player, error) {
 	p, err := c.player()
 	if err != nil {
 		return "", nil, err
 	}
+	const notSession = "not playing an spdj session; run: spdj start or spdj resume"
 	id, ok := strings.CutPrefix(p.contextURI(), "spotify:playlist:")
 	if !ok {
-		return "", p, fmt.Errorf("not playing a playlist; run: spdj start")
+		return "", p, fmt.Errorf(notSession)
+	}
+	var pl struct {
+		Name string `json:"name"`
+	}
+	if err := c.call("GET", "/playlists/"+id+"?fields=name", nil, &pl); err != nil {
+		return "", p, err
+	}
+	if !strings.HasPrefix(pl.Name, sessionPrefix) {
+		return "", p, fmt.Errorf(notSession)
 	}
 	return id, p, nil
 }

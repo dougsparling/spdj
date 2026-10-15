@@ -12,6 +12,8 @@ const usage = `spdj: agent-driven DJing on Spotify
   spdj auth --client-id ID [--redirect URI]
   spdj start --vibe TEXT [--seed current|"Artist - Title"|URI]
                                   new dated playlist seeded with a track, starts playing it
+  spdj sessions                   past sessions, most recent first
+  spdj resume [latest|TEXT]       continue a past session from its last track
   spdj add "Artist - Title" ...   append picks to the playing session
   spdj wait                       block until the track changes; prints one event line
   spdj status                     setlist, vibe and feedback notes
@@ -33,6 +35,10 @@ func main() {
 		err = cmdAPI(args)
 	case "start":
 		err = cmdStart(mustClient(), args)
+	case "sessions":
+		err = cmdSessions(mustClient())
+	case "resume":
+		err = cmdResume(mustClient(), args)
 	case "add":
 		err = cmdAdd(mustClient(), args)
 	case "wait":
