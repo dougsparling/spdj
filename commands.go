@@ -64,6 +64,7 @@ func cmdStart(c *Client, args []string) error {
 		return err
 	}
 	fmt.Printf("STARTED %q now=%q queued=0\n", name, track.String())
+	fmt.Println(nextAdd(0))
 	return nil
 }
 
@@ -104,6 +105,11 @@ func cmdAdd(c *Client, args []string) error {
 		}
 	}
 	fmt.Printf("queued=%d\n", n+len(uris))
+	if n+len(uris) >= queueDepth {
+		fmt.Println("next: run `spdj wait` in the background; it exits with one event line when the track changes")
+	} else {
+		fmt.Println(nextAdd(n + len(uris)))
+	}
 	return nil
 }
 
@@ -393,5 +399,11 @@ func cmdResume(c *Client, args []string) error {
 		return err
 	}
 	fmt.Printf("RESUMED %q now=%q tracks=%d queued=0\nnotes=%q\n", s.Name, tracks[len(tracks)-1].String(), len(tracks), s.Description)
+	fmt.Println(nextAdd(0))
 	return nil
+}
+
+// The next-step hints keep an agent in the loop even if it never read --help.
+func nextAdd(queued int) string {
+	return fmt.Sprintf("next: `spdj add` %d more pick(s), then run `spdj wait` in the background", queueDepth-queued)
 }
