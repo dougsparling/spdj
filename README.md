@@ -8,8 +8,7 @@ Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), s
 
 ## Requirements
 
-- **Spotify Premium.** Spotify only allows playback control for Premium accounts.
-- **A Spotify app (client ID).** About two minutes of setup, covered below.
+- **Spotify Premium.** Spotify only lets Premium accounts control playback, and only Premium accounts can own the developer app `spdj` needs.
 - **Go 1.22+** to install.
 - Spotify open and playing on some device (desktop app, phone, speaker).
 
@@ -19,24 +18,23 @@ Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), s
    ```sh
    go install github.com/dougsparling/spdj@latest
    ```
-2. Create a Spotify app at <https://developer.spotify.com/dashboard>:
-   - **Create app.** Any name and description.
-   - **Redirect URI:** `http://127.0.0.1:8888/callback` (exactly this; Spotify rejects `localhost`).
-   - **APIs used:** Web API.
-   - Copy the **Client ID** from the app's settings. You don't need the client secret.
-3. Log in:
+2. Log in:
    ```sh
-   spdj auth --client-id YOUR_CLIENT_ID
+   spdj auth
    ```
-   This opens a browser tab to approve access, then stores the token in `~/.config/spdj/config.json`.
+   The first time, this walks you through creating your own Spotify developer app (about two minutes in Spotify's dashboard; there's no way to automate it) and asks for its client ID. It then opens a browser tab to approve access and stores the login in `~/.config/spdj/config.json`.
 
-4. *(Optional)* Track backstories from Genius. Create an API client at <https://genius.com/api-clients> (the redirect URI is unused; anything valid works), click **Generate Access Token**, save the token to a file, then:
+   For reference, the app settings are: any name and description, redirect URI `http://127.0.0.1:8888/callback` (exactly this; Spotify rejects `localhost`), and the Web API. You don't need the client secret. If you already have a client ID, `spdj auth --client-id ID` skips the walkthrough.
+
+3. *(Optional)* Track backstories from Genius. Create an API client at <https://genius.com/api-clients> (the redirect URI is unused; anything valid works), click **Generate Access Token**, save the token to a file, then:
    ```sh
    spdj genius-token path/to/token.txt
    ```
    After that, `start`, `resume` and `wait` print an `about="…"` line for each new track when Genius has a description (roughly half of tracks). If Genius is blocked on your network, `spdj` uses `HTTPS_PROXY` or, on macOS, the system proxy.
 
-**Why do I need my own app?** Spotify caps apps that haven't been through their (business-only) review at a handful of users, so a shared client ID doesn't scale beyond a few friends. Your own app has no such issue, and the login flow (OAuth with PKCE) never needs a secret.
+**For agents helping someone set up:** `spdj auth` can't prompt when run by an agent. It prints the walkthrough and exits; relay the steps, ask the user for the client ID, then run `spdj auth --client-id ID` (it opens a browser tab for them to approve).
+
+**Why do I need my own app?** Spotify caps apps that haven't been through its review at a handful of users, each added by hand, and the review is only open to established businesses. A shared client ID can't scale past a few friends; your own app has no such limit. The login flow (OAuth with PKCE) never needs a client secret.
 
 ## For agents: how to DJ
 

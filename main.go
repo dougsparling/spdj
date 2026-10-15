@@ -1,15 +1,20 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
+
+	"golang.org/x/term"
 )
 
 const usage = `spdj: agent-driven DJing on Spotify
 
-  spdj auth --client-id ID [--redirect URI]
+  spdj auth [--client-id ID]      log in; without a client ID, walks you through creating one
   spdj genius-token FILE          optional: save a Genius API token so new tracks come with about= text
   spdj start --vibe TEXT [--seed current|"Artist - Title"|URI]
                                   new "SPDJ · vibe" playlist seeded with a track, starts playing it
@@ -105,10 +110,14 @@ func cmdAuth(args []string) error {
 	if *clientID != "" {
 		cfg.ClientID = *clientID
 	}
-	if cfg.ClientID == "" {
-		return fmt.Errorf("--client-id required")
-	}
 	cfg.RedirectURI = *redirect
+	if cfg.ClientID == "" {
+		id, err := walkthrough(cfg.RedirectURI)
+		if err != nil {
+			return err
+		}
+		cfg.ClientID = id
+	}
 	if err := authorize(cfg); err != nil {
 		return err
 	}
@@ -120,7 +129,48 @@ func cmdAuth(args []string) error {
 		return err
 	}
 	fmt.Printf("logged in as %s (%s)\n", me.ID, me.Product)
+	if me.Product != "premium" {
+		fmt.Println("warning: Spotify only allows playback control (and developer apps) for Premium accounts; spdj won't work without it")
+	}
 	return nil
+}
+
+var clientIDPattern = regexp.MustCompile(`^[0-9a-f]{32}$`)
+
+// walkthrough guides the user through creating their own Spotify app, which has to happen in
+// Spotify's dashboard: there is no API for it.
+func walkthrough(redirect string) (string, error) {
+	const dashboard = "https://developer.spotify.com/dashboard/create"
+	fmt.Printf(`spdj needs its own Spotify app (a client ID). This is a one-time, ~2 minute step.
+Requires Spotify Premium: Spotify only lets Premium accounts own developer apps or control playback.
+
+  1. Sign in at %s
+  2. Fill in:
+       App name:      spdj   (anything)
+       Description:   spdj   (anything)
+       Redirect URI:  %s   (click Add)
+       APIs used:     Web API
+  3. Accept the terms, click Save, and copy the Client ID from the app's page.
+     (The client secret isn't needed.)
+
+`, dashboard, redirect)
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		// no terminal to prompt on (e.g. run by an agent)
+		return "", fmt.Errorf("then run: spdj auth --client-id CLIENT_ID")
+	}
+	openBrowser(dashboard)
+	in := bufio.NewScanner(os.Stdin)
+	for {
+		fmt.Print("Client ID: ")
+		if !in.Scan() {
+			return "", fmt.Errorf("no client ID entered; run: spdj auth --client-id CLIENT_ID")
+		}
+		id := strings.ToLower(strings.TrimSpace(in.Text()))
+		if clientIDPattern.MatchString(id) {
+			return id, nil
+		}
+		fmt.Println("That doesn't look like a client ID (32 letters and digits). Try again.")
+	}
 }
 
 func cmdAPI(args []string) error {
