@@ -69,9 +69,9 @@ Keep two tracks queued (`add` refuses picks beyond that with `QUEUE_FULL`). More
 |---|---|---|
 | `NEXT now="…" queued=1` | Previous track played through. | Add one pick. |
 | `SKIPPED "…" at 0:41/4:12 now="…" flushed=N queued=0` | Listener skipped. `spdj` removed the skipped track and your stale picks from the playlist. | Treat it as negative feedback: adjust direction, add two picks. |
-| `MANUAL now="…" flushed=N queued=0` | Listener played something themselves. `spdj` pulled it into the session playlist and removed stale picks. | Strong positive signal about where they want to go. Add two picks that follow from it. |
 | `JUMP now="…" queued=N` | Listener moved around inside the playlist. | Top up to two if needed. |
 | `NEED_TRACK now="…" queued=N` | `wait` was called with fewer than two queued. | Add picks, then wait again. |
+| `ENDED now="…" …` | The player left the session: the listener played something outside the playlist, or something unexpected happened. | Stop the loop. `spdj resume` picks the session back up later. |
 | `IDLE …` | Nothing has played for 30 minutes. | Stop the loop. |
 
 Most of the time the listener is passive, so `NEXT` will be the common case. Treat a played-through track as mild approval, not enthusiasm.
@@ -108,17 +108,16 @@ spdj status                    # setlist, current position, vibe + feedback note
 
 ## How it works
 
-- **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (their pick)`). The only local file is the login token.
+- **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (liked)`). The only local file is the login token.
 - **`wait` polls** Spotify's player API every 3 seconds. It checks the track's liked state when it starts waiting and again when the track changes. A track that changes with more than ~11 seconds left counts as a skip.
 - **Picks are appended to the playlist**, which Spotify plays in order. `spdj start` turns shuffle off for this reason.
-- **Manual picks get steered back:** the track is inserted into the playlist and playback restarts on it from within the playlist at the same position (expect a brief hiccup).
+- **Anything unexpected ends the session.** If the player leaves the session playlist or plays a track that isn't in it, `wait` reports `ENDED` rather than guessing what the listener meant. To slip in a track of your own, add it to the session playlist in the app, or tell the agent.
 
 ## Limitations
 
 - **Session playlists are public.** `spdj` asks Spotify for private playlists, but Spotify's API ignores that. Use **Make private** in the playlist's `⋯` menu in the app if you care.
 - **New playlists may not show in the desktop app's sidebar until you restart it.** They're in your library either way, and you can always reach them from the queue ("Next from: …").
 
-- **Switching away hijacks your music.** If you put on a different album or playlist on purpose, `wait` treats it as a manual pick and pulls it into the session. Stop the agent's loop first.
 - **Spotify reads lag writes by a few seconds.** Two feedback notes written back-to-back can clobber each other, and `spdj sessions` may undercount tracks on a session that was just edited.
 - **The description holds about 500 characters.** Older notes get dropped to make room; the vibe is always kept.
 - **No recommendations.** Spotify removed its recommendations API for new apps, so picks come entirely from the agent's own knowledge of music.

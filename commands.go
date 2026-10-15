@@ -182,9 +182,11 @@ const (
 //
 //	NEXT       played through; agent should top the queue back up
 //	SKIPPED    listener skipped; skipped track and stale picks removed
-//	MANUAL     listener played something else; it was pulled into the playlist and stale picks removed
 //	JUMP       listener moved around inside the playlist
+//	ENDED      the player left the session (another context, or a track that isn't in it)
 //	IDLE       nothing playing for a long time
+//
+// Anything unexpected ends the session rather than guessing what the listener meant.
 func cmdWait(c *Client) error {
 	id, p, err := c.sessionPlaylist()
 	if err != nil {
@@ -206,7 +208,6 @@ func cmdWait(c *Client) error {
 	prev, lastProgress := p.Item, p.ProgressMS
 	// a like that appears while this track plays is a strong positive signal
 	wasLiked := c.isLiked(prev.URI)
-	offContext := false
 	idleSince := time.Now()
 	for {
 		time.Sleep(pollEvery)
@@ -222,11 +223,12 @@ func cmdWait(c *Client) error {
 			continue
 		}
 		idleSince = time.Now()
-		if sameSong(p.Item, prev) {
-			// the app's music-video toggle swaps in the same song under another ID or context;
-			// let it play, and resume the playlist when it ends rather than treating it as a pick
+		if p.contextURI() != sessionURI {
+			ended(p)
+			return nil
+		}
+		if p.Item.URI == prev.URI {
 			lastProgress = p.ProgressMS
-			offContext = offContext || p.Item.URI != prev.URI || p.contextURI() != sessionURI
 			continue
 		}
 		liked := ""
@@ -234,63 +236,31 @@ func cmdWait(c *Client) error {
 			liked = " liked=new"
 			c.addNote(id, "+"+prev.Name+" (liked)")
 		}
-		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p, liked, offContext); err != nil {
+		inSession, err := trackChanged(c, id, prev, lastProgress, p, liked)
+		if err != nil {
 			return err
 		}
-		printAbout(c, p.Item)
+		if inSession {
+			printAbout(c, p.Item)
+		}
 		return nil
 	}
 }
 
+// trackChanged classifies a track change inside the session and prints the event.
 // liked is appended to the event line (" liked=new" when the previous track was liked while playing).
-func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress int, p *Player, liked string, offContext bool) error {
+func trackChanged(c *Client, id string, prev *Track, lastProgress int, p *Player, liked string) (inSession bool, err error) {
 	tracks, err := c.playlistTracks(id)
 	if err != nil {
-		return err
+		return false, err
 	}
 	prevIdx := lastIndex(tracks, prev.URI)
 	newIdx := currentIndex(tracks, p.Item)
 	now := p.Item.String()
 
-	if offContext && (p.contextURI() != sessionURI || newIdx < 0) && prevIdx >= 0 && prevIdx+1 < len(tracks) {
-		// the last song played outside the playlist (e.g. as a music video); whatever followed it there
-		// isn't the listener's pick, so carry on with the next queued track
-		newIdx = prevIdx + 1
-		if err := c.call("PUT", "/me/player/play", map[string]any{
-			"context_uri": sessionURI,
-			"offset":      map[string]int{"position": newIdx},
-		}, nil); err != nil {
-			return err
-		}
-		p.Item, p.Context = &tracks[newIdx], &struct {
-			URI string `json:"uri"`
-		}{sessionURI}
-		now = p.Item.String()
-	}
-
-	if p.contextURI() != sessionURI || newIdx < 0 {
-		// pull the listener's pick into the setlist right after the last track and resume the playlist on it
-		var stale []string
-		pos := len(tracks)
-		if prevIdx >= 0 {
-			stale, pos = uris(tracks[prevIdx+1:]), prevIdx+1
-		}
-		if err := c.removeTracks(id, stale); err != nil {
-			return err
-		}
-		if err := c.addTracks(id, []string{p.Item.URI}, pos); err != nil {
-			return err
-		}
-		if err := c.call("PUT", "/me/player/play", map[string]any{
-			"context_uri": sessionURI,
-			"offset":      map[string]int{"position": pos},
-			"position_ms": p.ProgressMS + 1000,
-		}, nil); err != nil {
-			return err
-		}
-		c.addNote(id, "+"+p.Item.Name+" (their pick)")
-		fmt.Printf("MANUAL now=%q flushed=%d queued=0%s\n", now, len(stale), liked)
-		return nil
+	if newIdx < 0 {
+		ended(p)
+		return false, nil
 	}
 
 	remaining := time.Duration(prev.DurationMS-lastProgress) * time.Millisecond
@@ -300,7 +270,7 @@ func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress in
 	case remaining > pollEvery+playedSlack:
 		stale := uris(tracks[newIdx+1:])
 		if err := c.removeTracks(id, append(stale, prev.URI)); err != nil {
-			return err
+			return true, err
 		}
 		c.addNote(id, "-"+prev.Name+" (skip)")
 		fmt.Printf("SKIPPED %q at %s/%s now=%q flushed=%d queued=0%s\n",
@@ -308,7 +278,11 @@ func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress in
 	default:
 		fmt.Printf("NEXT now=%q queued=%d%s\n", now, len(tracks)-newIdx-1, liked)
 	}
-	return nil
+	return true, nil
+}
+
+func ended(p *Player) {
+	fmt.Printf("ENDED now=%q is outside the session; stop the loop (spdj resume continues it later)\n", p.Item.String())
 }
 
 // currentIndex finds the playing track in the setlist; with repeats, the latest occurrence wins.

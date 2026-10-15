@@ -29,9 +29,9 @@ Agents: you are the DJ, spdj handles playback.
   3. Run spdj wait in the background. It exits with one line when the track changes:
        NEXT        played through: mild approval; add 1
        SKIPPED     listener skipped it (removed, stale picks flushed): change direction; add 2
-       MANUAL      listener played something themselves (now in the setlist): follow it; add 2
        JUMP        listener moved within the playlist; top up to 2
        NEED_TRACK  fewer than 2 queued; add picks
+       ENDED       listener took over (played something outside the session); stop the loop
        IDLE        nothing played for 30m; stop
      Any event may end with liked=new: the listener liked the previous track while it played,
      the strongest positive signal you'll get. ADDED lines marked [liked] are known favourites.
