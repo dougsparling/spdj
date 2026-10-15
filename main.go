@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 
 	"golang.org/x/term"
@@ -57,6 +58,10 @@ func main() {
 		os.Exit(2)
 	}
 	if a := os.Args[1]; a == "version" || a == "--version" {
+		// `go install …@vX.Y.Z` builds don't get the release ldflags, but Go records the module version
+		if info, ok := debug.ReadBuildInfo(); ok && version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			version = strings.TrimPrefix(info.Main.Version, "v")
+		}
 		fmt.Println("spdj", version)
 		return
 	}
