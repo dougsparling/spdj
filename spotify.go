@@ -261,3 +261,12 @@ func norm(s string) string {
 	}
 	return b.String()
 }
+
+// isLiked reports whether the track is in the listener's Liked Songs; errors count as not liked.
+func (c *Client) isLiked(uri string) bool {
+	var res []bool
+	if err := c.call("GET", "/me/library/contains?uris="+url.QueryEscape(uri), nil, &res); err != nil || len(res) == 0 {
+		return false
+	}
+	return res[0]
+}

@@ -98,7 +98,11 @@ func cmdAdd(c *Client, args []string) error {
 			continue
 		}
 		uris = append(uris, t.URI)
-		fmt.Printf("ADDED %q (%s)\n", t.String(), t.Album.Name)
+		flag := ""
+		if c.isLiked(t.URI) {
+			flag = " [liked]"
+		}
+		fmt.Printf("ADDED %q (%s)%s\n", t.String(), t.Album.Name, flag)
 	}
 	if len(uris) > 0 {
 		if err := c.addTracks(id, uris, -1); err != nil {
@@ -196,6 +200,8 @@ func cmdWait(c *Client) error {
 	}
 
 	prev, lastProgress := p.Item, p.ProgressMS
+	// a like that appears while this track plays is a strong positive signal
+	wasLiked := c.isLiked(prev.URI)
 	idleSince := time.Now()
 	for {
 		time.Sleep(pollEvery)
@@ -215,7 +221,12 @@ func cmdWait(c *Client) error {
 			lastProgress = p.ProgressMS
 			continue
 		}
-		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p); err != nil {
+		liked := ""
+		if !wasLiked && c.isLiked(prev.URI) {
+			liked = " liked=new"
+			c.addNote(id, "+"+prev.Name+" (liked)")
+		}
+		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p, liked); err != nil {
 			return err
 		}
 		printAbout(c, p.Item)
@@ -223,7 +234,8 @@ func cmdWait(c *Client) error {
 	}
 }
 
-func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress int, p *Player) error {
+// liked is appended to the event line (" liked=new" when the previous track was liked while playing).
+func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress int, p *Player, liked string) error {
 	tracks, err := c.playlistTracks(id)
 	if err != nil {
 		return err
@@ -253,24 +265,24 @@ func trackChanged(c *Client, id, sessionURI string, prev *Track, lastProgress in
 			return err
 		}
 		c.addNote(id, "+"+p.Item.Name+" (their pick)")
-		fmt.Printf("MANUAL now=%q flushed=%d queued=0\n", now, len(stale))
+		fmt.Printf("MANUAL now=%q flushed=%d queued=0%s\n", now, len(stale), liked)
 		return nil
 	}
 
 	remaining := time.Duration(prev.DurationMS-lastProgress) * time.Millisecond
 	switch {
 	case prevIdx >= 0 && newIdx != prevIdx+1:
-		fmt.Printf("JUMP now=%q queued=%d\n", now, len(tracks)-newIdx-1)
+		fmt.Printf("JUMP now=%q queued=%d%s\n", now, len(tracks)-newIdx-1, liked)
 	case remaining > pollEvery+playedSlack:
 		stale := uris(tracks[newIdx+1:])
 		if err := c.removeTracks(id, append(stale, prev.URI)); err != nil {
 			return err
 		}
 		c.addNote(id, "-"+prev.Name+" (skip)")
-		fmt.Printf("SKIPPED %q at %s/%s now=%q flushed=%d queued=0\n",
-			prev.String(), mmss(lastProgress), mmss(prev.DurationMS), now, len(stale))
+		fmt.Printf("SKIPPED %q at %s/%s now=%q flushed=%d queued=0%s\n",
+			prev.String(), mmss(lastProgress), mmss(prev.DurationMS), now, len(stale), liked)
 	default:
-		fmt.Printf("NEXT now=%q queued=%d\n", now, len(tracks)-newIdx-1)
+		fmt.Printf("NEXT now=%q queued=%d%s\n", now, len(tracks)-newIdx-1, liked)
 	}
 	return nil
 }

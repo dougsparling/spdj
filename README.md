@@ -76,6 +76,8 @@ Keep two tracks queued (`add` refuses picks beyond that with `QUEUE_FULL`). More
 
 Most of the time the listener is passive, so `NEXT` will be the common case. Treat a played-through track as mild approval, not enthusiasm.
 
+Any event can end with `liked=new`: the listener added the previous track to their Liked Songs while it played. That's the strongest positive signal you'll get, so lean into it. `add` also marks picks that are already in their Liked Songs with `[liked]`.
+
 ### Resuming a past session
 
 ```sh
@@ -107,7 +109,7 @@ spdj status                    # setlist, current position, vibe + feedback note
 ## How it works
 
 - **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (their pick)`). The only local file is the login token.
-- **`wait` polls** Spotify's player API every 3 seconds. A track that changes with more than ~11 seconds left counts as a skip.
+- **`wait` polls** Spotify's player API every 3 seconds. It checks the track's liked state when it starts waiting and again when the track changes. A track that changes with more than ~11 seconds left counts as a skip.
 - **Picks are appended to the playlist**, which Spotify plays in order. `spdj start` turns shuffle off for this reason.
 - **Manual picks get steered back:** the track is inserted into the playlist and playback restarts on it from within the playlist at the same position (expect a brief hiccup).
 
