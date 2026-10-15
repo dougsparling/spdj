@@ -85,7 +85,7 @@ func cmdAdd(c *Client, args []string) error {
 	var uris []string
 	for i, q := range args {
 		if n+len(uris) >= queueDepth {
-			fmt.Printf("QUEUE_FULL not added: %q (keep %d queued; deeper picks go stale when the listener skips)\n",
+			fmt.Printf("QUEUE_FULL not added: %q (keep %d queued)\n",
 				args[i:], queueDepth)
 			break
 		}
@@ -111,7 +111,7 @@ func cmdAdd(c *Client, args []string) error {
 	}
 	fmt.Printf("queued=%d\n", n+len(uris))
 	if n+len(uris) >= queueDepth {
-		fmt.Println("next: run `spdj wait` in the background; it exits with one event line when the track changes. Introduce each new track to the listener in a line or two.")
+		fmt.Println("next: spdj wait (background); introduce each new track")
 	} else {
 		fmt.Println(nextAdd(n + len(uris)))
 	}
@@ -423,5 +423,5 @@ func cmdResume(c *Client, args []string) error {
 
 // The next-step hints keep an agent in the loop even if it never read --help.
 func nextAdd(queued int) string {
-	return fmt.Sprintf("next: `spdj add` %d more pick(s), then run `spdj wait` in the background", queueDepth-queued)
+	return fmt.Sprintf("next: spdj add %d more, then spdj wait (background)", queueDepth-queued)
 }

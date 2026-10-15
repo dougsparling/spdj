@@ -23,7 +23,8 @@ const usage = `spdj: agent-driven DJing on Spotify
 
 Agents: you are the DJ, spdj handles playback.
   1. spdj start (or spdj resume), seeded from what's playing or a track that fits the vibe
-  2. spdj add two picks. Keep exactly 2 queued; add refuses more.
+  2. spdj add two picks. Keep exactly 2 queued (add refuses more): deeper picks go stale
+     as soon as the listener skips or gives feedback.
   3. Run spdj wait in the background. It exits with one line when the track changes:
        NEXT        played through: mild approval; add 1
        SKIPPED     listener skipped it (removed, stale picks flushed): change direction; add 2
