@@ -42,7 +42,7 @@ func cmdStart(c *Client, args []string) error {
 		track = t
 	}
 
-	name := sessionPrefix + *vibe
+	name := sessionName(*vibe)
 	var pl struct {
 		ID string `json:"id"`
 	}
@@ -424,4 +424,20 @@ func cmdResume(c *Client, args []string) error {
 // The next-step hints keep an agent in the loop even if it never read --help.
 func nextAdd(queued int) string {
 	return fmt.Sprintf("next: spdj add %d more, then spdj wait (background)", queueDepth-queued)
+}
+
+// Spotify's app rejects playlist names over 100 characters even though the API accepts them.
+const maxNameLen = 100
+
+// sessionName fits the vibe into the name limit at a word boundary; the full vibe stays in the description.
+func sessionName(vibe string) string {
+	name := []rune(sessionPrefix + vibe)
+	if len(name) <= maxNameLen {
+		return string(name)
+	}
+	cut := string(name[:maxNameLen-1])
+	if i := strings.LastIndex(cut, " "); i > len(sessionPrefix) {
+		cut = cut[:i]
+	}
+	return strings.TrimRight(cut, " ,;:·-") + "…"
 }

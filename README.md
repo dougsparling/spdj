@@ -115,6 +115,9 @@ spdj status                    # setlist, current position, vibe + feedback note
 
 ## Limitations
 
+- **Session playlists are public.** `spdj` asks Spotify for private playlists, but Spotify's API ignores that. Use **Make private** in the playlist's `⋯` menu in the app if you care.
+- **New playlists may not show in the desktop app's sidebar until you restart it.** They're in your library either way, and you can always reach them from the queue ("Next from: …").
+
 - **Switching away hijacks your music.** If you put on a different album or playlist on purpose, `wait` treats it as a manual pick and pulls it into the session. Stop the agent's loop first.
 - **Spotify reads lag writes by a few seconds.** Two feedback notes written back-to-back can clobber each other, and `spdj sessions` may undercount tracks on a session that was just edited.
 - **The description holds about 500 characters.** Older notes get dropped to make room; the vibe is always kept.
