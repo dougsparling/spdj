@@ -1,14 +1,16 @@
 # spdj
 
-Let an AI agent DJ your Spotify. You put on a track (or describe a vibe), and the agent keeps the music going: it picks what plays next, notices when you skip something, and adjusts.
+Let an AI agent DJ your Spotify. You put on a track (or describe a vibe), and the agent keeps the music going: it picks what plays next, notices when you skip or like something, and adjusts.
 
-`spdj` is the command-line tool the agent drives. It was built for long listening sessions, where driving Spotify through a chatty API integration burns a lot of tokens. `spdj` does the polling and playlist bookkeeping itself and only wakes the agent with a one-line event when a decision is needed.
+`spdj` is the command-line tool the agent drives. It does the polling and playlist bookkeeping itself and only wakes the agent when a decision is needed. This is much more token efficient than Claude driving the official Spotify connector/MCP directly.
 
 Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), so you keep the setlist afterwards and can pick the set back up later.
 
 ## Requirements
 
-- **Spotify Premium.** Spotify only lets Premium accounts control playback, and only Premium accounts can own the developer app `spdj` needs.
+Unfortunately scripting the Spotify client, reverse engineering its API or driving the public API directly aren't practical for a small hobby app like this. So Premium and some extra setup is required:
+
+- **Spotify Premium.** Spotify only lets Premium accounts control playback, and only Premium accounts can own a developer app.
 - **Go 1.22+** to install.
 - Spotify open and playing on some device (desktop app, phone, speaker).
 
@@ -22,21 +24,33 @@ Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), s
    ```sh
    spdj auth
    ```
-   The first time, this walks you through creating your own Spotify developer app (about two minutes in Spotify's dashboard; there's no way to automate it) and asks for its client ID. It then opens a browser tab to approve access and stores the login in `~/.config/spdj/config.json`.
+   The first time, this walks you through creating your own Spotify developer app (there's no way to automate it) and asks for its client ID. It then opens a browser tab to approve access and stores the login in `~/.config/spdj/config.json`.
 
-   For reference, the app settings are: any name and description, redirect URI `http://127.0.0.1:8888/callback` (exactly this; Spotify rejects `localhost`), and the Web API. You don't need the client secret. If you already have a client ID, `spdj auth --client-id ID` skips the walkthrough.
+   For reference, the app settings are: any name and description, redirect URI `http://127.0.0.1:8888/callback` (exactly this; Spotify rejects `localhost`), and Web API scope. You don't need the client secret. If you already have a client ID, `spdj auth --client-id ID` skips the walkthrough.
 
-3. *(Optional)* Track backstories from Genius. Create an API client at <https://genius.com/api-clients> (the redirect URI is unused; anything valid works), click **Generate Access Token**, save the token to a file, then:
+3. *(Optional)* Track backstories from Genius. Create an API client at <https://genius.com/api-clients> (the redirect URI is unused; anything valid works), click **Generate Access Token**, save the token to a file, then you can paste the token:
    ```sh
-   spdj genius-token path/to/token.txt
+   spdj genius-token
    ```
-   After that, `start`, `resume` and `wait` print an `about="…"` line for each new track when Genius has a description (roughly half of tracks). If Genius is blocked on your network, `spdj` uses `HTTPS_PROXY` or, on macOS, the system proxy.
+   Which will prompt for the token. After that, the DJ agent will have track descriptions at its disposal.
 
-**For agents helping someone set up:** `spdj auth` can't prompt when run by an agent. It prints the walkthrough and exits; relay the steps, ask the user for the client ID, then run `spdj auth --client-id ID` (it opens a browser tab for them to approve).
+## How it works
 
-**Why do I need my own app?** Spotify caps apps that haven't been through its review at a handful of users, each added by hand, and the review is only open to established businesses. A shared client ID can't scale past a few friends; your own app has no such limit. The login flow (OAuth with PKCE) never needs a client secret.
+- **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (liked)`). The only local file is the login token.
+- **`wait` polls** Spotify's player API every 3 seconds. It checks the track's liked state when it starts waiting and again when the track changes. A track that changes with more than ~11 seconds left counts as a skip.
+- **Picks are appended to the playlist**, which Spotify plays in order. `spdj start` turns shuffle off for this reason.
+- **Anything unexpected ends the session.** If the player leaves the session playlist or plays a track that isn't in it, `wait` reports `ENDED` rather than guessing what the listener meant. To slip in a track of your own, add it to the session playlist in the app, or tell the agent.
 
-## For agents: how to DJ
+## Limitations
+
+- **Session playlists are public.** `spdj` asks Spotify for private playlists, but Spotify's API ignores that. Use **Make private** in the playlist's `⋯` menu in the app if you care.
+- **New playlists may not show in the desktop app's sidebar until you restart it.** They're in your library either way, and you can always reach them from the queue ("Next from: …").
+
+- **Spotify reads lag writes by a few seconds.** Two feedback notes written back-to-back can clobber each other, and `spdj sessions` may undercount tracks on a session that was just edited.
+- **The description holds about 500 characters.** Older notes get dropped to make room; the vibe is always kept.
+- **No recommendations.** Spotify removed its recommendations API for new apps, so picks come entirely from the agent's own knowledge of music.
+
+## For AI agents: how to DJ
 
 You are the DJ. `spdj` handles playback mechanics; you choose the music.
 
@@ -104,22 +118,10 @@ spdj status                    # setlist, current position, vibe + feedback note
 - Avoid the same artist twice in a row unless asked.
 - When the listener says something about the music, `spdj note` it, then adjust.
 
-## How it works
+### Helping the human with setup
 
-- **No local session state.** The `SPDJ · …` playlist that's currently playing *is* the session: its tracks are the setlist, and its description holds the vibe and feedback (`slow + weird · -Torn Maps (skip) · +Tilt (liked)`). The only local file is the login token.
-- **`wait` polls** Spotify's player API every 3 seconds. It checks the track's liked state when it starts waiting and again when the track changes. A track that changes with more than ~11 seconds left counts as a skip.
-- **Picks are appended to the playlist**, which Spotify plays in order. `spdj start` turns shuffle off for this reason.
-- **Anything unexpected ends the session.** If the player leaves the session playlist or plays a track that isn't in it, `wait` reports `ENDED` rather than guessing what the listener meant. To slip in a track of your own, add it to the session playlist in the app, or tell the agent.
+`spdj auth` can't prompt when run by an agent. It prints the walkthrough and exits; relay the steps, ask the user for the client ID, then run `spdj auth --client-id ID` (it opens a browser tab for them to approve). `spdj genius-token FILE` also accepts a file with the secret if you have it.
 
-## Limitations
-
-- **Session playlists are public.** `spdj` asks Spotify for private playlists, but Spotify's API ignores that. Use **Make private** in the playlist's `⋯` menu in the app if you care.
-- **New playlists may not show in the desktop app's sidebar until you restart it.** They're in your library either way, and you can always reach them from the queue ("Next from: …").
-
-- **Spotify reads lag writes by a few seconds.** Two feedback notes written back-to-back can clobber each other, and `spdj sessions` may undercount tracks on a session that was just edited.
-- **The description holds about 500 characters.** Older notes get dropped to make room; the vibe is always kept.
-- **No recommendations.** Spotify removed its recommendations API for new apps, so picks come entirely from the agent's own knowledge of music.
-
-## Debugging
+### Debugging
 
 `spdj api METHOD PATH [JSON]` makes a raw, authenticated Web API call and prints the response, e.g. `spdj api GET /me/player`.
