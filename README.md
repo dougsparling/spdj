@@ -30,6 +30,12 @@ Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), s
    ```
    This opens a browser tab to approve access, then stores the token in `~/.config/spdj/config.json`.
 
+4. *(Optional)* Track backstories from Genius. Create an API client at <https://genius.com/api-clients> (the redirect URI is unused; anything valid works), click **Generate Access Token**, save the token to a file, then:
+   ```sh
+   spdj genius-token path/to/token.txt
+   ```
+   After that, `start`, `resume` and `wait` print an `about="…"` line for each new track when Genius has a description (roughly half of tracks). If Genius is blocked on your network, `spdj` uses `HTTPS_PROXY` or, on macOS, the system proxy.
+
 **Why do I need my own app?** Spotify caps apps that haven't been through their (business-only) review at a handful of users, so a shared client ID doesn't scale beyond a few friends. Your own app has no such issue, and the login flow (OAuth with PKCE) never needs a secret.
 
 ## For agents: how to DJ
@@ -53,7 +59,7 @@ You are the DJ. `spdj` handles playback mechanics; you choose the music.
    ```
 4. **React to the event**, add picks until `queued=2` again, and go back to step 3.
 
-When a new track starts, give the listener a line or two of flavour: who it is, where it comes from, and why it fits (or turns) the set. The listener is mostly passive, and this is what makes it feel like a DJ rather than a shuffle button.
+When a new track starts, give the listener a line or two of flavour: who it is, where it comes from, and why it fits (or turns) the set. If the event came with an `about=` line, draw on it, but paraphrase rather than reading it out. The listener is mostly passive, and this is what makes it feel like a DJ rather than a shuffle button.
 
 Keep two tracks queued (`add` refuses picks beyond that with `QUEUE_FULL`). More than that and the picks go stale when the listener gives feedback; fewer and Spotify's autoplay can take over if a track ends while you're thinking.
 

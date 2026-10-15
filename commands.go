@@ -64,6 +64,7 @@ func cmdStart(c *Client, args []string) error {
 		return err
 	}
 	fmt.Printf("STARTED %q now=%q queued=0\n", name, track.String())
+	printAbout(c, track)
 	fmt.Println(nextAdd(0))
 	return nil
 }
@@ -214,7 +215,11 @@ func cmdWait(c *Client) error {
 			lastProgress = p.ProgressMS
 			continue
 		}
-		return trackChanged(c, id, sessionURI, prev, lastProgress, p)
+		if err := trackChanged(c, id, sessionURI, prev, lastProgress, p); err != nil {
+			return err
+		}
+		printAbout(c, p.Item)
+		return nil
 	}
 }
 
@@ -399,6 +404,7 @@ func cmdResume(c *Client, args []string) error {
 		return err
 	}
 	fmt.Printf("RESUMED %q now=%q tracks=%d queued=0\nnotes=%q\n", s.Name, tracks[len(tracks)-1].String(), len(tracks), s.Description)
+	printAbout(c, &tracks[len(tracks)-1])
 	fmt.Println(nextAdd(0))
 	return nil
 }

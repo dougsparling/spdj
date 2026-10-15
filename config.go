@@ -15,6 +15,7 @@ type Config struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`
 	Expiry       time.Time `json:"expiry"`
+	GeniusToken  string    `json:"genius_token,omitempty"`
 }
 
 func configPath() string {

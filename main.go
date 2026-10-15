@@ -10,6 +10,7 @@ import (
 const usage = `spdj: agent-driven DJing on Spotify
 
   spdj auth --client-id ID [--redirect URI]
+  spdj genius-token FILE          optional: save a Genius API token so new tracks come with about= text
   spdj start --vibe TEXT [--seed current|"Artist - Title"|URI]
                                   new "SPDJ · vibe" playlist seeded with a track, starts playing it
   spdj sessions                   past sessions, most recent first
@@ -31,7 +32,7 @@ Agents: you are the DJ, spdj handles playback.
        NEED_TRACK  fewer than 2 queued; add picks
        IDLE        nothing played for 30m; stop
   4. Top back up to 2 and wait again. Record anything the listener says with spdj note.
-  When a new track starts, give the listener a line or two of flavour: who it is, where it comes
+  When a new track starts, give the listener a line or two of flavour (use the about= line if present): who it is, where it comes
   from, and why it fits (or turns) the set. They're mostly passive; this is the DJ's patter.
 `
 
@@ -49,6 +50,8 @@ func main() {
 	switch cmd {
 	case "auth":
 		err = cmdAuth(args)
+	case "genius-token":
+		err = cmdGeniusToken(args)
 	case "api":
 		err = cmdAPI(args)
 	case "start":
