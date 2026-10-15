@@ -1,0 +1,32 @@
+# Release config: `git tag vX.Y.Z && git push origin vX.Y.Z` runs this via .github/workflows/release.yml.
+# Local dry run: goreleaser release --snapshot --clean
+version: 2
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    # Named after `uname -s`/`uname -m` output, without the version, so the README's one-liner can
+    # fetch releases/latest/download/spdj_$(uname -s)_$(uname -m).tar.gz on macOS and Linux.
+    name_template: >-
+      {{ .ProjectName }}_{{ title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if and (eq .Os "linux") (eq .Arch "arm64") }}aarch64
+      {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc

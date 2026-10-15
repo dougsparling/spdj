@@ -11,15 +11,20 @@ Each session becomes a regular Spotify playlist (e.g. `SPDJ · slow + weird`), s
 Unfortunately scripting the Spotify client, reverse engineering its API or driving the public API directly aren't practical for a small hobby app like this. So Premium and some extra setup is required:
 
 - **Spotify Premium.** Spotify only lets Premium accounts control playback, and only Premium accounts can own a developer app.
-- **Go 1.22+** to install.
+- **macOS or Linux** for the one-line install, or **Go 1.22+** to build from source (any OS, including Windows).
 - Spotify open and playing on some device (desktop app, phone, speaker).
 
 ## Setup (for the human)
 
-1. Install:
+1. Install the latest release into `~/.local/bin` (make sure it's on your `PATH`):
+   ```sh
+   mkdir -p ~/.local/bin && curl -fsSL "https://github.com/dougsparling/spdj/releases/latest/download/spdj_$(uname -s)_$(uname -m).tar.gz" | tar -xz -C ~/.local/bin spdj
+   ```
+   Or build from source with Go:
    ```sh
    go install github.com/dougsparling/spdj@latest
    ```
+   Windows binaries are on the [releases page](https://github.com/dougsparling/spdj/releases).
 2. Log in:
    ```sh
    spdj auth

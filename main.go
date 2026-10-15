@@ -48,10 +48,17 @@ Agents: you are the DJ, spdj handles playback.
   paraphrase. The listener is mostly passive; this is the DJ's patter.
 `
 
+// version is set at release build time by GoReleaser.
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprint(os.Stderr, usage)
 		os.Exit(2)
+	}
+	if a := os.Args[1]; a == "version" || a == "--version" {
+		fmt.Println("spdj", version)
+		return
 	}
 	if a := os.Args[1]; a == "help" || a == "-h" || a == "--help" {
 		fmt.Print(usage)
