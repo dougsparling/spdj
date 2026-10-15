@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // Genius supplies the "About" text for a track, which agents use for their between-track patter.
@@ -129,14 +131,35 @@ func printAbout(c *Client, t *Track) {
 }
 
 func cmdGeniusToken(args []string) error {
-	if len(args) != 1 {
-		return fmt.Errorf("usage: spdj genius-token FILE  (file holds a Genius API access token)")
+	var token string
+	switch {
+	case len(args) == 1:
+		b, err := os.ReadFile(args[0])
+		if err != nil {
+			return err
+		}
+		token = string(b)
+	case len(args) == 0 && term.IsTerminal(int(os.Stdin.Fd())):
+		fmt.Print(`Genius gives spdj a short backstory for many tracks. To get a token:
+  1. Sign in at https://genius.com/api-clients and click New API Client
+     (any name; the redirect URI is unused, e.g. http://127.0.0.1:8888/callback)
+  2. Click Generate Access Token and copy it (not the client ID or secret)
+
+`)
+		fmt.Print("Access token (input hidden): ")
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			return err
+		}
+		token = string(b)
+	default:
+		return fmt.Errorf("usage: spdj genius-token [FILE]  (prompts for the token when FILE is omitted)")
 	}
-	b, err := os.ReadFile(args[0])
-	if err != nil {
-		return err
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("no token entered")
 	}
-	token := strings.TrimSpace(string(b))
 	var probe struct{}
 	if err := geniusGet(token, "/search?per_page=1&q=test", &probe); err != nil {
 		return fmt.Errorf("token check failed: %w", err)

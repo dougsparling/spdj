@@ -15,7 +15,8 @@ import (
 const usage = `spdj: agent-driven DJing on Spotify
 
   spdj auth [--client-id ID]      log in; without a client ID, walks you through creating one
-  spdj genius-token FILE          optional: save a Genius API token so new tracks come with about= text
+  spdj genius-token [FILE]        optional: save a Genius API token (prompts if no FILE) so new
+                                  tracks come with about= text
   spdj start --vibe TEXT [--seed current|"Artist - Title"|URI]
                                   new "SPDJ · vibe" playlist seeded with a track, starts playing it
   spdj sessions                   past sessions, most recent first
